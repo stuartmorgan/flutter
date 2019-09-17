@@ -228,7 +228,7 @@ List<Plugin> findPlugins(FlutterProject project) {
 /// Returns true if .flutter-plugins has changed, otherwise returns false.
 bool _writeFlutterPluginsList(FlutterProject project, List<Plugin> plugins) {
   final File pluginsFile = project.flutterPluginsFile;
-  final String oldContents = _readFlutterPluginsList(project);
+  final String oldContents = _readFlutterPluginsList(pluginsFile);
   final String pluginManifest =
       plugins.map<String>((Plugin p) => '${p.name}=${escapePath(p.path)}').join('\n');
   if (pluginManifest.isNotEmpty) {
@@ -238,15 +238,35 @@ bool _writeFlutterPluginsList(FlutterProject project, List<Plugin> plugins) {
       pluginsFile.deleteSync();
     }
   }
-  final String newContents = _readFlutterPluginsList(project);
+  final String newContents = _readFlutterPluginsList(pluginsFile);
   return oldContents != newContents;
 }
 
-/// Returns the contents of the `.flutter-plugins` file in [project], or
+/// Returns true if the platform-specific file has changed, otherwise returns false.
+bool _writeFlutterPlatformPluginsList(PlatformProject project, List<Plugin> plugins) {
+  final List<Plugin> platformSupportedPlugins = plugins.where((Plugin p) {
+    return p.platforms.containsKey(project.pluginConfigKey);
+  });
+  final File pluginsFile = project.platformPluginsFile;
+  final String oldContents = _readFlutterPluginsList(pluginsFile);
+  String newContents;
+  if (platformSupportedPlugins.isNotEmpty) {
+    newContents =
+        plugins.map<String>((Plugin p) => '${p.name}=${escapePath(p.path)}').join('\n');
+    pluginsFile.writeAsStringSync('$newContents\n', flush: true);
+  } else {
+    if (pluginsFile.existsSync()) {
+      pluginsFile.deleteSync();
+    }
+  }
+  return newContents != oldContents;
+}
+
+/// Returns the contents of a `.flutter-plugins` file, or
 /// null if that file does not exist.
-String _readFlutterPluginsList(FlutterProject project) {
-  return project.flutterPluginsFile.existsSync()
-      ? project.flutterPluginsFile.readAsStringSync()
+String _readFlutterPluginsList(File pluginFile) {
+  return pluginFile.existsSync()
+      ? pluginFile.readAsStringSync()
       : null;
 }
 
@@ -500,12 +520,21 @@ Future<void> _writeWebPluginRegistrant(FlutterProject project, List<Plugin> plug
 /// Assumes `pub get` has been executed since last change to `pubspec.yaml`.
 void refreshPluginsList(FlutterProject project, {bool checkProjects = false}) {
   final List<Plugin> plugins = findPlugins(project);
-  final bool changed = _writeFlutterPluginsList(project, plugins);
-  if (changed) {
-    if (checkProjects && !project.ios.existsSync()) {
-      return;
+  // Write the legacy global plugin list.
+  _writeFlutterPluginsList(project, plugins);
+  // Write the per-platform plugin lists.
+  _writeFlutterPlatformPluginsList(project.android, plugins);
+  if (_writeFlutterPlatformPluginsList(project.ios, plugins)) {
+    if (!checkProjects || project.ios.existsSync()) {
+      cocoaPods.invalidatePodInstallOutput(project.ios);
     }
-    cocoaPods.invalidatePodInstallOutput(project.ios);
+  }
+  // TODO(stuartmorgan): Add checkProjects handling here once a decision is
+  // reached about how handle desktop in existing projects.
+  if (_writeFlutterPlatformPluginsList(project.macos, plugins)) {
+    if (project.macos.existsSync()) {
+      cocoaPods.invalidatePodInstallOutput(project.macos);
+    }
   }
 }
 
@@ -551,5 +580,5 @@ Future<void> injectPlugins(FlutterProject project, {bool checkProjects = false})
 ///
 /// Assumes [refreshPluginsList] has been called since last change to `pubspec.yaml`.
 bool hasPlugins(FlutterProject project) {
-  return _readFlutterPluginsList(project) != null;
+  return _readFlutterPluginsList(project.flutterPluginsFile) != null;
 }

@@ -241,7 +241,8 @@ class FlutterPlugin implements Plugin<Project> {
     }
 
     private Properties getPluginList(Project project) {
-        File pluginsFile = new File(project.projectDir.parentFile.parentFile, '.flutter-plugins')
+        // XXX Is this the right path? (I.e., is projectDir the gradle root?)
+        File pluginsFile = new File(project.projectDir, '.flutter-plugins')
         return readPropertiesIfExist(pluginsFile)
     }
 
