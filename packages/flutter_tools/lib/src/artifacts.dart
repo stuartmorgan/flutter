@@ -814,6 +814,10 @@ String _getIosEngineArtifactPath(String engineDirectory,
   Directory? flutterFrameworkSource;
   for (final Directory platformDirectory
       in xcframeworkDirectory.listSync().whereType<Directory>()) {
+    // XXX Hard-code xros as a hack to get past this step.
+    if (platformDirectory.basename.startsWith('xros-')) {
+      flutterFrameworkSource = platformDirectory;
+    }
     if (!platformDirectory.basename.startsWith('ios-')) {
       continue;
     }

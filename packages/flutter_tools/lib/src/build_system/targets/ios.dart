@@ -662,6 +662,7 @@ Future<void> _createStubAppFramework(File outputFile, Environment environment,
 
     final EnvironmentType? environmentType = environmentTypeFromSdkroot(sdkRoot, fileSystem);
 
+    // XXX Hack to build for xros instead.
     await globals.xcode!.clang(<String>[
       '-x',
       'c',
@@ -669,10 +670,10 @@ Future<void> _createStubAppFramework(File outputFile, Environment environment,
       stubSource.path,
       '-dynamiclib',
       // Keep version in sync with AOTSnapshotter flag
-      if (environmentType == EnvironmentType.physical)
+      /*if (environmentType == EnvironmentType.physical)
         '-miphoneos-version-min=11.0'
       else
-        '-miphonesimulator-version-min=11.0',
+        '-miphonesimulator-version-min=11.0',*/
       '-Xlinker', '-rpath', '-Xlinker', '@executable_path/Frameworks',
       '-Xlinker', '-rpath', '-Xlinker', '@loader_path/Frameworks',
       '-fapplication-extension',
